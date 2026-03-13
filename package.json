@@ -10,7 +10,15 @@
   "license": "Apache-2.0",
   "keywords": [
     "convex",
-    "component"
+    "component",
+    "convex-component",
+    "cascading-deletes",
+    "cascade",
+    "database",
+    "relationships",
+    "referential-integrity",
+    "cleanup",
+    "delete"
   ],
   "type": "module",
   "scripts": {
