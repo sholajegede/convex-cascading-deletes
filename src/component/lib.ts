@@ -1,40 +1,8 @@
 import { v } from "convex/values";
 import {
-  internalMutation,
   mutation,
   query,
 } from "./_generated/server.js";
-
-export const logDeletion = internalMutation({
-  args: {
-    rootTable: v.string(),
-    rootId: v.string(),
-    deletedCounts: v.string(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("deletionLogs")
-      .withIndex("by_root", (q) =>
-        q.eq("rootTable", args.rootTable).eq("rootId", args.rootId),
-      )
-      .first();
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        deletedCounts: args.deletedCounts,
-        deletedAt: Date.now(),
-      });
-    } else {
-      await ctx.db.insert("deletionLogs", {
-        rootTable: args.rootTable,
-        rootId: args.rootId,
-        deletedCounts: args.deletedCounts,
-        deletedAt: Date.now(),
-      });
-    }
-    return null;
-  },
-});
 
 export const recordDeletion = mutation({
   args: {

@@ -6,7 +6,7 @@
   "bugs": {
     "url": "https://github.com/sholajegede/convex-cascading-deletes/issues"
   },
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "Apache-2.0",
   "keywords": [
     "convex",
@@ -53,16 +53,14 @@
       "types": "./dist/client/index.d.ts",
       "default": "./dist/client/index.js"
     },
-    "./react": {
-      "types": "./dist/react/index.d.ts",
-      "default": "./dist/react/index.js"
-    },
     "./test": "./src/test.ts",
     "./_generated/component.js": {
-      "types": "./dist/component/_generated/component.d.ts"
+      "types": "./dist/component/_generated/component.d.ts",
+      "default": "./dist/component/_generated/component.js"
     },
     "./_generated/component": {
-      "types": "./dist/component/_generated/component.d.ts"
+      "types": "./dist/component/_generated/component.d.ts",
+      "default": "./dist/component/_generated/component.js"
     },
     "./convex.config.js": {
       "types": "./dist/component/convex.config.d.ts",
