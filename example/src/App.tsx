@@ -553,8 +553,8 @@ export default function App() {
                             fontSize: 11,
                             padding: "5px 12px",
                             borderRadius: 5,
-                            cursor: !!deletingId ? "not-allowed" : "pointer",
-                            opacity: !!deletingId ? 0.5 : 1,
+                            cursor: deletingId ? "not-allowed" : "pointer",
+                            opacity: deletingId ? 0.5 : 1,
                             letterSpacing: "0.04em",
                           }}
                         >
