@@ -24,22 +24,6 @@ import type { FunctionReference } from "convex/server";
 export type ComponentApi<Name extends string | undefined = string | undefined> =
   {
     lib: {
-      deleteWithCascade: FunctionReference<
-        "action",
-        "internal",
-        {
-          id: string;
-          relationships: Array<{
-            fieldName: string;
-            indexName: string;
-            sourceTable: string;
-            targetTable: string;
-          }>;
-          table: string;
-        },
-        string,
-        Name
-      >;
       getDeletionLog: FunctionReference<
         "query",
         "internal",
@@ -52,6 +36,27 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           rootId: string;
           rootTable: string;
         },
+        Name
+      >;
+      listDeletionLogs: FunctionReference<
+        "query",
+        "internal",
+        {},
+        Array<{
+          _creationTime: number;
+          _id: string;
+          deletedAt: number;
+          deletedCounts: string;
+          rootId: string;
+          rootTable: string;
+        }>,
+        Name
+      >;
+      recordDeletion: FunctionReference<
+        "mutation",
+        "internal",
+        { deletedCounts: string; rootId: string; rootTable: string },
+        null,
         Name
       >;
       validateIndexes: FunctionReference<
