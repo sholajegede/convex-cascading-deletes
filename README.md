@@ -1,91 +1,31 @@
-# Convex Component Template
+# @sholajegede/convex-cascading-deletes
 
-This is a Convex component, ready to be published on npm.
+A [Convex component](https://www.convex.dev/components) for managing cascading deletes across related documents. Configure relationships via your existing indexes — when you delete a record, all dependent records are cleaned up automatically.
 
-To create your own component:
+[![npm version](https://badge.fury.io/js/@sholajegede%2Fconvex-cascading-deletes.svg)](https://badge.fury.io/js/@sholajegede%2Fconvex-cascading-deletes)
+[![Convex Component](https://www.convex.dev/components/badge/sholajegede/convex-cascading-deletes)](https://www.convex.dev/components/sholajegede/convex-cascading-deletes)
 
-1. Write code in src/component for your component. Component-specific tables,
-   queries, mutations, and actions go here.
-1. Write code in src/client for the Class that interfaces with the component.
-   This is the bridge your users will access to get information into and out of
-   your component
-1. Write example usage in example/convex/example.ts.
-1. Delete the text in this readme until `---` and flesh out the README.
-1. Publish to npm with `npm run alpha` or `npm run release`.
-
-To develop your component run a dev process in the example project:
-
-```sh
-npm i
-npm run dev
-```
-
-`npm i` will do the install and an initial build. `npm run dev` will start a
-file watcher to re-build the component, as well as the example project frontend
-and backend, which does codegen and installs the component.
-
-Modify the schema and index files in src/component/ to define your component.
-
-Write a client for using this component in src/client/index.ts.
-
-If you won't be adding frontend code (e.g. React components) to this component
-you can delete "./react" references in package.json and "src/react/" directory.
-If you will be adding frontend code, add a peer dependency on React in
-package.json.
-
-### Component Directory structure
-
-```
-.
-├── README.md           documentation of your component
-├── package.json        component name, version number, other metadata
-├── package-lock.json   Components are like libraries, package-lock.json
-│                       is .gitignored and ignored by consumers.
-├── src
-│   ├── component/
-│   │   ├── _generated/ Files here are generated for the component.
-│   │   ├── convex.config.ts  Name your component here and use other components
-│   │   ├── lib.ts    Define functions here and in new files in this directory
-│   │   └── schema.ts   schema specific to this component
-│   ├── client/
-│   │   └── index.ts    Code that needs to run in the app that uses the
-│   │                   component. Generally the app interacts directly with
-│   │                   the component's exposed API (src/component/*).
-│   └── react/          Code intended to be used on the frontend goes here.
-│       │               Your are free to delete this if this component
-│       │               does not provide code.
-│       └── index.ts
-├── example/            example Convex app that uses this component
-│   └── convex/
-│       ├── _generated/       Files here are generated for the example app.
-│       ├── convex.config.ts  Imports and uses this component
-│       ├── myFunctions.ts    Functions that use the component
-│       └── schema.ts         Example app schema
-└── dist/               Publishing artifacts will be created here.
-```
-
----
-
-# Convex Convex Cascading Deletes
-
-[![npm version](https://badge.fury.io/js/@example%2Fconvex-cascading-deletes.svg)](https://badge.fury.io/js/@example%2Fconvex-cascading-deletes)
+Found a bug? Feature request? [File it here](https://github.com/sholajegede/convex-cascading-deletes/issues).
 
 <!-- START: Include on https://convex.dev/components -->
 
-- [ ] What is some compelling syntax as a hook?
-- [ ] Why should you use this component?
-- [ ] Links to docs / other resources?
+## Features
 
-Found a bug? Feature request?
-[File it here](https://github.com/sholajegede/convex-cascading-deletes/issues).
+- **Cascading deletes** — delete a record and all its dependents in one call
+- **Relationship config** — declare relationships once using your existing indexes
+- **Scheduler-based batching** — large deletion trees are processed in batches via the Convex scheduler; deletes within a batch are atomic
+- **Circular relationship protection** — visited tracking prevents infinite loops
+- **Safe db helper** — patch `ctx.db` to throw on direct `.delete()` calls, enforcing cascade-only deletions
+- **Deletion logs** — every cascade is logged with a per-table count, queryable reactively
+- **Index validation** — validate your relationship config against the deployment at startup
 
 ## Installation
+```sh
+npm install @sholajegede/convex-cascading-deletes
+```
 
-Create a `convex.config.ts` file in your app's `convex/` folder and install the
-component by calling `use`:
-
+Add the component to your `convex/convex.config.ts`:
 ```ts
-// convex/convex.config.ts
 import { defineApp } from "convex/server";
 import convexCascadingDeletes from "@sholajegede/convex-cascading-deletes/convex.config.js";
 
@@ -97,50 +37,125 @@ export default app;
 
 ## Usage
 
+Instantiate the client once, declaring your table relationships:
 ```ts
-import { components } from "./_generated/api";
+// convex/cascadeDeletes.ts
+import { components } from "./_generated/api.js";
+import { CascadingDeletes } from "@sholajegede/convex-cascading-deletes";
 
-export const addComment = mutation({
-  args: { text: v.string(), targetId: v.string() },
+export const cascadingDeletes = new CascadingDeletes(components.convexCascadingDeletes, {
+  relationships: [
+    {
+      sourceTable: "posts",      // child table
+      targetTable: "users",      // parent table
+      indexName: "by_user",      // index on posts that references users
+      fieldName: "userId",       // field on posts that holds the user ID
+    },
+    {
+      sourceTable: "comments",
+      targetTable: "posts",
+      indexName: "by_post",
+      fieldName: "postId",
+    },
+  ],
+});
+```
+
+### Delete with cascade
+```ts
+// convex/users.ts
+import { action } from "./_generated/server.js";
+import { cascadingDeletes } from "./cascadeDeletes.js";
+import { v } from "convex/values";
+
+export const deleteUser = action({
+  args: { userId: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.runMutation(components.convexCascadingDeletes.lib.add, {
-      text: args.text,
-      targetId: args.targetId,
-      userId: await getAuthUserId(ctx),
+    const counts = await cascadingDeletes.deleteWithCascade(ctx, {
+      table: "users",
+      id: args.userId,
     });
+    // counts: { users: 1, posts: 4, comments: 12 }
+    return counts;
   },
 });
 ```
 
-See more example usage in [example.ts](./example/convex/example.ts).
+Deleting a user cascades to their posts, then to each post's comments — all automatically, in the correct order.
 
-### HTTP Routes
-
-You can register HTTP routes for the component to expose HTTP endpoints:
-
+### Enforce cascade-only deletions
 ```ts
-import { httpRouter } from "convex/server";
-import { registerRoutes } from "@sholajegede/convex-cascading-deletes";
-import { components } from "./_generated/api";
-
-const http = httpRouter();
-
-registerRoutes(http, components.convexCascadingDeletes, {
-  pathPrefix: "/comments",
+export const updatePost = mutation({
+  args: { postId: v.id("posts"), title: v.string() },
+  handler: async (ctx, args) => {
+    const db = cascadingDeletes.getSafeDb(ctx);
+    // db.delete() now throws — use deleteWithCascade instead
+    await db.patch(args.postId, { title: args.title }); // fine
+  },
 });
-
-export default http;
 ```
 
-This will expose a GET endpoint that returns the most recent comment as JSON.
-The endpoint requires a `targetId` query parameter. See
-[http.ts](./example/convex/http.ts) for a complete example.
+### Query deletion logs
+```ts
+// convex/logs.ts
+import { query } from "./_generated/server.js";
+import { components } from "./_generated/api.js";
+import { v } from "convex/values";
+
+export const getDeletionLog = query({
+  args: { table: v.string(), id: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.runQuery(components.convexCascadingDeletes.lib.getDeletionLog, {
+      rootTable: args.table,
+      rootId: args.id,
+    });
+  },
+});
+```
+```tsx
+// React — subscribes reactively
+const log = useQuery(api.logs.getDeletionLog, { table: "users", id: userId });
+// log.deletedCounts — JSON string: { "users": 1, "posts": 4, "comments": 12 }
+// log.deletedAt     — timestamp of when the cascade ran
+```
+
+### Validate indexes at startup
+```ts
+export const onStartup = mutation({
+  handler: async (ctx) => {
+    await cascadingDeletes.validate(ctx);
+  },
+});
+```
+
+## API
+
+### `CascadingDeletes` class
+
+| Method | Description |
+|--------|-------------|
+| `deleteWithCascade(ctx, { table, id })` | Delete a record and all configured dependents. Returns `{ [table]: count }`. |
+| `getDeletionLog(ctx, { table, id })` | Query the deletion log for a previously deleted record. |
+| `getSafeDb(ctx)` | Returns a patched `ctx.db` that throws on `.delete()`. |
+| `validate(ctx)` | Validates all configured relationships against the deployment. |
+
+### Relationship config
+
+| Field | Description |
+|-------|-------------|
+| `sourceTable` | The child table (holds the foreign key) |
+| `targetTable` | The parent table (the one being deleted) |
+| `indexName` | Index on `sourceTable` that references `targetTable` |
+| `fieldName` | Field on `sourceTable` that holds the parent ID |
 
 <!-- END: Include on https://convex.dev/components -->
 
-Run the example:
-
+## Development
 ```sh
 npm i
 npm run dev
 ```
+
+## License
+
+Apache-2.0
